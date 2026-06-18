@@ -73,9 +73,12 @@ async function readState() {
   try {
     return JSON.parse(await readFile(stateFilePath, "utf-8"));
   } catch {
-    return { creditFromBlock: 0, processedDeposits: {} };
+    return { processedDeposits: {} }; // no creditFromBlock: fall back to env / head
   }
 }
+
+// Public Base Sepolia RPCs cap eth_getLogs at 2000 blocks per query.
+const MAX_LOG_RANGE = 1900;
 async function writeState(state) {
   await mkdir(dirname(stateFilePath), { recursive: true });
   await writeFile(stateFilePath, JSON.stringify(state, null, 2));
@@ -84,35 +87,43 @@ async function writeState(state) {
 async function syncDeposits(state) {
   if (!vaultAddress || !ledgerAddress) return;
   const vault = new Contract(vaultAddress, VAULT_ABI, provider);
-  const fromBlock = state.creditFromBlock ?? Number(process.env.CREDIT_BRIDGE_FROM_BLOCK ?? "0");
-  const toBlock = await provider.getBlockNumber();
-  if (toBlock < fromBlock) return;
+  const head = await provider.getBlockNumber();
 
-  const events = await vault.queryFilter(vault.filters.CreditPurchased(), fromBlock, toBlock);
-  for (const ev of events) {
-    const { token, profile, amount, nonce } = ev.args;
-    const ref = depositRef(ev.transactionHash, nonce);
-    if (state.processedDeposits?.[ref]) continue;
+  // Resume from saved progress; else from CREDIT_BRIDGE_FROM_BLOCK; else from the
+  // chain head (start watching now). Scanning from 0 would mean tens of thousands
+  // of getLogs calls, so a sensible start block is required to backfill.
+  const envFrom = Number(process.env.CREDIT_BRIDGE_FROM_BLOCK);
+  let fromBlock = state.creditFromBlock ?? (Number.isFinite(envFrom) && envFrom > 0 ? envFrom : head);
+  if (head < fromBlock) return;
 
-    const meta = creditTokens.get(String(token).toLowerCase());
-    if (!meta) {
-      console.warn(`[credit] skip unknown token ${token} (deposit ${ref})`);
-      continue;
+  for (let start = fromBlock; start <= head; start += MAX_LOG_RANGE) {
+    const end = Math.min(start + MAX_LOG_RANGE - 1, head);
+    const events = await vault.queryFilter(vault.filters.CreditPurchased(), start, end);
+    for (const ev of events) {
+      const { token, profile, amount, nonce } = ev.args;
+      const ref = depositRef(ev.transactionHash, nonce);
+      if (state.processedDeposits?.[ref]) continue;
+
+      const meta = creditTokens.get(String(token).toLowerCase());
+      if (!meta) {
+        console.warn(`[credit] skip unknown token ${token} (deposit ${ref})`);
+        continue;
+      }
+      const atto = attoCreditsForDeposit({ rawAmount: amount, decimals: meta.decimals, creditsPerToken: meta.creditsPerToken });
+      const profileAddr = profileFromBytes32(profile);
+
+      await glClient.writeContract({
+        address: ledgerAddress,
+        functionName: "credit",
+        args: [profileAddr, atto.toString(), ref],
+        value: 0n,
+      });
+      state.processedDeposits = state.processedDeposits || {};
+      state.processedDeposits[ref] = true;
+      console.log(`[credit] +${atto} atto -> ${profileAddr} (${ref})`);
     }
-    const atto = attoCreditsForDeposit({ rawAmount: amount, decimals: meta.decimals, creditsPerToken: meta.creditsPerToken });
-    const profileAddr = profileFromBytes32(profile);
-
-    await glClient.writeContract({
-      address: ledgerAddress,
-      functionName: "credit",
-      args: [profileAddr, atto.toString(), ref],
-      value: 0n,
-    });
-    state.processedDeposits = state.processedDeposits || {};
-    state.processedDeposits[ref] = true;
-    console.log(`[credit] +${atto} atto -> ${profileAddr} (${ref})`);
+    state.creditFromBlock = end + 1; // persist progress per chunk
   }
-  state.creditFromBlock = toBlock + 1;
 }
 
 async function syncRedeems() {
