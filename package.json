@@ -1,0 +1,54 @@
+{
+  "name": "flashcast-gl",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "test:evm": "hardhat test --config hardhat.config.cjs",
+    "compile:evm": "hardhat compile --config hardhat.config.cjs",
+    "test:gl": ".venv/bin/pytest tests/direct -v",
+    "lint:gl": ".venv/bin/genvm-lint check contracts/credit_ledger.py && .venv/bin/genvm-lint check contracts/prediction_market.py",
+    "deploy:vault": "hardhat run deploy/deploy-credit-vault.cjs --network baseSepolia --config hardhat.config.cjs",
+    "deploy:ledger": "node ./deploy/deploy-credit-ledger.mjs",
+    "deploy:market": "node ./deploy/deploy-prediction-market.mjs",
+    "wire": "node ./deploy/wire-contracts.mjs",
+    "bridge": "node ./deploy/credit-bridge.mjs"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "ethers": "^6.16.0",
+    "genlayer-js": "^0.23.1",
+    "lucide-react": "^0.462.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
+    "@nomicfoundation/hardhat-ethers": "^3.1.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.1.2",
+    "@openzeppelin/contracts": "^5.6.1",
+    "@types/node": "^22.16.5",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react-swc": "^3.11.0",
+    "autoprefixer": "^10.4.21",
+    "chai": "^4.5.0",
+    "dotenv": "^17.3.1",
+    "ethers": "^6.16.0",
+    "hardhat": "^2.26.3",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "vite": "^5.4.19"
+  }
+}
