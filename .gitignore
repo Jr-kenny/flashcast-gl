@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.venv/
+artifacts/
+hardhat-artifacts/
+hardhat-cache/
+.env
+.env.local
+__pycache__/
+.pytest_cache/
+deploy/deployments/*.local.json
