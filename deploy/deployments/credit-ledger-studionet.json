@@ -1,0 +1,10 @@
+{
+  "network": "studionet",
+  "deployedAt": "2026-06-18",
+  "deployer": "0xa64f1832D8Dd4F8c6Ad434D3942a09fEFc9ad2b3",
+  "contract": "CreditLedger",
+  "address": "0x1b9De0F8280Bea1c482a980c1EA83740C25F1070",
+  "config": {
+    "bridge": "0xa64f1832D8Dd4F8c6Ad434D3942a09fEFc9ad2b3"
+  }
+}

@@ -85,6 +85,19 @@ CREDIT_BRIDGE_ENABLED=1 pnpm bridge   # run the relayer
 Then set the `VITE_*` contract addresses in `.env` so the frontend loads live
 markets.
 
+## Live deployment
+
+Deployed 2026-06-18 on GenLayer Studionet and Base Sepolia:
+
+| Contract | Network | Address |
+| --- | --- | --- |
+| CreditLedger | Studionet | `0x1b9De0F8280Bea1c482a980c1EA83740C25F1070` |
+| PredictionMarket | Studionet | `0x42E4CAb02F51c531b43b14752F87133271c28eA4` |
+| CreditVault | Base Sepolia | `0x7460acF508d73703802A26EE21bCaAD889a08757` |
+
+The market is wired as an approved ledger caller. `deploy/smoke-market.mjs`
+creates a market and reads it back; the first live market (`M0`) is already up.
+
 ## Notes and limits
 
 - Direct-mode tests freeze block time at deploy, so the market uses inclusive

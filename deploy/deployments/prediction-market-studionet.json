@@ -1,0 +1,11 @@
+{
+  "network": "studionet",
+  "deployedAt": "2026-06-18",
+  "deployer": "0xa64f1832D8Dd4F8c6Ad434D3942a09fEFc9ad2b3",
+  "contract": "PredictionMarket",
+  "address": "0x42E4CAb02F51c531b43b14752F87133271c28eA4",
+  "config": {
+    "ledger": "0x1b9De0F8280Bea1c482a980c1EA83740C25F1070",
+    "feeSink": "0xa64f1832D8Dd4F8c6Ad434D3942a09fEFc9ad2b3"
+  }
+}
