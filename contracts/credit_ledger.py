@@ -100,17 +100,16 @@ class CreditLedger(gl.Contract):
         self.balances[caller] = u256(int(self.balances[caller]) - amt)
         self.balances[p] = u256(int(self.balances.get(p, u256(0))) + amt)
 
-    # ---- redeem requests (bridge-driven) ----
+    # ---- redeem requests (caller-initiated; settlement is bridge-driven) ----
     @gl.public.write
     def request_redeem(
         self,
-        profile: Address,
         atto_amount: u256,
         payout_wallet: Address,
         token: str,
     ) -> u256:
-        self._require_bridge()
-        p = self._addr(profile)
+        # The caller redeems their own balance; the relayer settles it on the vault.
+        p = gl.message.sender_address
         amount = int(atto_amount)
         if amount <= 0:
             raise gl.vm.UserError(ERR + "Redeem amount must be positive.")

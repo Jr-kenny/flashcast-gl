@@ -99,9 +99,11 @@ def test_request_redeem_debits_and_queues(direct_vm, direct_deploy, direct_owner
     direct_vm.sender = direct_owner
     ledger = direct_deploy(LEDGER, direct_owner)
 
-    direct_vm.sender = direct_owner  # bridge
+    direct_vm.sender = direct_owner  # bridge credits the deposit
     ledger.credit(direct_alice, 10 * ONE, "dep-1")
-    ledger.request_redeem(direct_alice, 4 * ONE, direct_alice, "ETH")
+
+    direct_vm.sender = direct_alice  # the holder redeems their own balance
+    ledger.request_redeem(4 * ONE, direct_alice, "ETH")
 
     assert int(ledger.get_balance(direct_alice)) == 6 * ONE
     assert int(ledger.get_redeem_count()) == 1
