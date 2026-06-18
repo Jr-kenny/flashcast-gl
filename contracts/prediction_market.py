@@ -12,7 +12,7 @@ ZERO_ADDRESS = Address("0x0000000000000000000000000000000000000000")
 ERR = "[EXPECTED] "
 MIN_OUTCOMES = 2
 MAX_OUTCOMES = 8
-MIN_OPEN_SECONDS = 300            # a market must stay open at least 5 minutes
+DEFAULT_MIN_OPEN_SECONDS = 300    # a market must stay open at least 5 minutes
 MAX_SOURCE_LEN = 400
 FEE_BPS = 200                     # 2% protocol fee on the gross winnings
 
@@ -56,6 +56,7 @@ class PredictionMarket(gl.Contract):
     owner: Address
     ledger: Address
     fee_sink: Address
+    min_open: u256
     market_nonce: u256
     markets: TreeMap[str, Market]
     market_ids: DynArray[str]
@@ -64,11 +65,17 @@ class PredictionMarket(gl.Contract):
     bettor_stakes: TreeMap[str, u256]   # key f"{mid}:{addr_hex}:{idx}"
     claimed: TreeMap[str, bool]         # key f"{mid}:{addr_hex}"
 
-    def __init__(self, ledger: Address = ZERO_ADDRESS, fee_sink: Address = ZERO_ADDRESS):
+    def __init__(
+        self,
+        ledger: Address = ZERO_ADDRESS,
+        fee_sink: Address = ZERO_ADDRESS,
+        min_open_seconds: u256 = u256(DEFAULT_MIN_OPEN_SECONDS),
+    ):
         self.owner = gl.message.sender_address
         self.ledger = self._addr(ledger)
         fs = self._addr(fee_sink)
         self.fee_sink = fs if fs != ZERO_ADDRESS else gl.message.sender_address
+        self.min_open = u256(int(min_open_seconds))
         self.market_nonce = u256(0)
 
     # ---- market creation ----
@@ -94,7 +101,7 @@ class PredictionMarket(gl.Contract):
             raise gl.vm.UserError(ERR + "Source URL must be https.")
         if len(src) > MAX_SOURCE_LEN:
             raise gl.vm.UserError(ERR + "Source URL is too long.")
-        if int(close_time) < self._now_epoch() + MIN_OPEN_SECONDS:
+        if int(close_time) < self._now_epoch() + int(self.min_open):
             raise gl.vm.UserError(ERR + "Close time is too soon.")
 
         market_id = "M" + str(int(self.market_nonce))
@@ -148,7 +155,7 @@ class PredictionMarket(gl.Contract):
         m = self._require_market(market_id)
         if m.status != "open":
             raise gl.vm.UserError(ERR + "Market is not open.")
-        if self._now_epoch() >= int(m.close_time):
+        if self._now_epoch() > int(m.close_time):
             raise gl.vm.UserError(ERR + "Market is closed.")
         idx = int(outcome_index)
         if idx < 0 or idx >= int(m.outcome_count):
@@ -158,7 +165,8 @@ class PredictionMarket(gl.Contract):
             raise gl.vm.UserError(ERR + "Bet must be positive.")
 
         bettor = gl.message.sender_address
-        CreditLedgerIface(self.ledger).emit(on="accepted").lock_from(bettor, u256(amt))
+        if self.ledger != ZERO_ADDRESS:
+            CreditLedgerIface(self.ledger).emit(on="accepted").lock_from(bettor, u256(amt))
 
         ot_key = market_id + ":" + str(idx)
         self.outcome_totals[ot_key] = u256(int(self.outcome_totals.get(ot_key, u256(0))) + amt)
@@ -243,11 +251,17 @@ class PredictionMarket(gl.Contract):
     def _normalize(self, response: typing.Any, labels: list[str]) -> TreeMap[str, typing.Any]:
         data = response if isinstance(response, dict) else {}
         raw = str(data.get("outcome", "")).strip()
-        out = "UNKNOWN"
-        for i in range(len(labels)):
-            if labels[i].lower() == raw.lower():
-                out = labels[i]
-                break
+        # Empty or an explicit UNKNOWN means "not determinable yet" -> retry.
+        # An allowed label resolves the market. Anything else is treated as an
+        # out-of-set answer and voids the market (safe refund) rather than guess.
+        if not raw or raw.upper() == "UNKNOWN":
+            out = "UNKNOWN"
+        else:
+            out = raw
+            for i in range(len(labels)):
+                if labels[i].lower() == raw.lower():
+                    out = labels[i]
+                    break
         return {"outcome": out, "reasoning": str(data.get("reasoning", "")).strip()[:600]}
 
     # ---- claim (parimutuel payout + void refund) ----
@@ -281,7 +295,7 @@ class PredictionMarket(gl.Contract):
             raise gl.vm.UserError(ERR + "Market is not settled.")
 
         self.claimed[ck] = True
-        if payout > 0:
+        if payout > 0 and self.ledger != ZERO_ADDRESS:
             CreditLedgerIface(self.ledger).emit(on="accepted").award(bettor, u256(payout))
         return u256(payout)
 
@@ -293,6 +307,10 @@ class PredictionMarket(gl.Contract):
         return total
 
     # ---- views ----
+    @gl.public.view
+    def now_epoch(self) -> u256:
+        return u256(self._now_epoch())
+
     @gl.public.view
     def get_market(self, market_id: str) -> Market:
         return self._require_market(market_id)
