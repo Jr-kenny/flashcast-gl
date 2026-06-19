@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Coins, Compass, PlusCircle, Trophy, User, Zap } from "lucide-react";
+import { Coins, Compass, PlusCircle, Trophy, User, Wallet, Zap } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { toCredits, shortAddr } from "@/lib/format";
+import { NEED_AUTH } from "@/lib/genlayer";
 import { useProfile } from "@/lib/useProfile";
+import { AuthModal } from "@/components/AuthModal";
 
 const NAV = [
   { to: "/", label: "Markets", icon: Compass, end: true },
@@ -14,6 +17,16 @@ const NAV = [
 
 export default function Layout() {
   const { address, balance } = useProfile();
+  const [authOpen, setAuthOpen] = useState(false);
+
+  // Browse freely; the chooser only opens when an action needs an identity, or
+  // when the user clicks Connect.
+  useEffect(() => {
+    const open = () => setAuthOpen(true);
+    window.addEventListener(NEED_AUTH, open);
+    return () => window.removeEventListener(NEED_AUTH, open);
+  }, []);
+
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-20 border-b border-white/5 bg-ink-950/70 backdrop-blur-xl">
@@ -47,17 +60,31 @@ export default function Layout() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="chip border-flash/20 bg-flash/10 text-flash">
-              <Coins className="h-3.5 w-3.5" />
-              {toCredits(balance)} cr
-            </div>
-            <div className="chip text-slate-300" title={address}>
-              <span className="h-2 w-2 rounded-full bg-pop" />
-              {shortAddr(address) || "no identity"}
-            </div>
+            {address ? (
+              <>
+                <div className="chip border-flash/20 bg-flash/10 text-flash">
+                  <Coins className="h-3.5 w-3.5" />
+                  {toCredits(balance)} cr
+                </div>
+                <button
+                  className="chip text-slate-300 transition hover:bg-white/5"
+                  title="Switch or connect a different identity"
+                  onClick={() => setAuthOpen(true)}
+                >
+                  <span className="h-2 w-2 rounded-full bg-pop" />
+                  {shortAddr(address)}
+                </button>
+              </>
+            ) : (
+              <button className="btn-primary" onClick={() => setAuthOpen(true)}>
+                <Wallet className="h-4 w-4" /> Connect
+              </button>
+            )}
           </div>
         </div>
       </header>
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         <Outlet />

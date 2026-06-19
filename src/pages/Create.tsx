@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, X } from "lucide-react";
-import { createMarket } from "@/lib/genlayer";
+import { createMarket, requireIdentity } from "@/lib/genlayer";
 import { ConfigBanner, Notice, Spinner } from "@/components/ui";
 
 export default function Create() {
@@ -21,6 +21,7 @@ export default function Create() {
 
   async function submit() {
     setErr("");
+    if (!requireIdentity()) return;
     const labels = outcomes.map((o) => o.trim()).filter(Boolean);
     if (!title.trim()) return setErr("Add a title.");
     if (!question.trim()) return setErr("Add a resolution question.");

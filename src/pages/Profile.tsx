@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Copy } from "lucide-react";
-import { getStake, listMarkets, profileAddress, type MarketView } from "@/lib/genlayer";
+import { Copy, Settings } from "lucide-react";
+import { getStake, listMarkets, profileAddress, requireIdentity, type MarketView } from "@/lib/genlayer";
 import { toBig, toCredits } from "@/lib/format";
 import { useProfile } from "@/lib/useProfile";
 import { ConfigBanner, Notice, Spinner, StatusChip } from "@/components/ui";
+import { SettingsModal } from "@/components/SettingsModal";
 
 interface Position {
   market: MarketView;
@@ -15,6 +16,7 @@ export default function Profile() {
   const { address, balance } = useProfile();
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,6 +35,13 @@ export default function Profile() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-slate-100">Profile</h1>
+        <button className="btn-ghost" onClick={() => requireIdentity() && setSettingsOpen(true)}>
+          <Settings className="h-4 w-4" /> Settings
+        </button>
+      </div>
+
       <div className="card flex items-center justify-between p-6">
         <div>
           <div className="text-xs uppercase tracking-wide text-slate-500">Your identity</div>
@@ -72,6 +81,8 @@ export default function Profile() {
           </div>
         )}
       </div>
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

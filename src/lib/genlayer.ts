@@ -6,19 +6,67 @@ import { CONFIG } from "./config";
 const CHAINS: Record<string, any> = { localnet, studionet, testnetAsimov, testnetBradbury };
 const PK_KEY = "flashcast.gl.pk";
 
-/** A burner GenLayer identity, persisted in localStorage. This address is the
- *  user's profile: deposits on Base Sepolia are tagged with it. */
-export function getPrivateKey(): string {
-  let pk = localStorage.getItem(PK_KEY);
-  if (!pk) {
-    pk = Wallet.createRandom().privateKey;
-    localStorage.setItem(PK_KEY, pk);
-  }
-  return pk;
-}
+/** Fired whenever the signing identity changes (created, imported, connected, or
+ *  cleared) so every `useProfile` consumer can refresh. */
+export const IDENTITY_CHANGED = "flashcast:identity";
+
+/** Fired when an action needs an identity but none exists, so the layout can open
+ *  the sign-in chooser. Lets people browse markets first and only sign in to act. */
+export const NEED_AUTH = "flashcast:need-auth";
 
 let _client: any;
 let _account: any;
+let _readAccount: any;
+
+function resetClient() {
+  _account = undefined;
+  _client = undefined;
+}
+
+function broadcast() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(IDENTITY_CHANGED));
+}
+
+/** True once this browser holds a GenLayer signing identity. */
+export function hasIdentity(): boolean {
+  return Boolean(localStorage.getItem(PK_KEY));
+}
+
+export function getPrivateKey(): string {
+  const pk = localStorage.getItem(PK_KEY);
+  if (!pk) throw new Error("No identity yet. Sign in to create or connect one.");
+  return pk;
+}
+
+/** Validate, persist, and broadcast a signing identity. Accepts any private key,
+ *  whether randomly generated, derived from a wallet, or pasted by the user. The
+ *  address it yields is the profile: deposits on Base Sepolia are tagged with it. */
+export function storeIdentity(rawKey: string): string {
+  const wallet = new Wallet(rawKey.trim()); // throws on a malformed key
+  localStorage.setItem(PK_KEY, wallet.privateKey);
+  resetClient();
+  broadcast();
+  return wallet.address;
+}
+
+/** Create a fresh random burner identity, persisted in this browser. */
+export function generateIdentity(): string {
+  return storeIdentity(Wallet.createRandom().privateKey);
+}
+
+export function clearIdentity(): void {
+  localStorage.removeItem(PK_KEY);
+  resetClient();
+  broadcast();
+}
+
+/** Guard for actions that need a signing identity. Returns true if one exists;
+ *  otherwise opens the sign-in chooser and returns false so the caller can stop. */
+export function requireIdentity(): boolean {
+  if (hasIdentity()) return true;
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(NEED_AUTH));
+  return false;
+}
 
 export function getAccount() {
   if (!_account) _account = createAccount(getPrivateKey() as `0x${string}`);
@@ -26,7 +74,15 @@ export function getAccount() {
 }
 
 export function profileAddress(): string {
-  return getAccount().address;
+  return hasIdentity() ? getAccount().address : "";
+}
+
+/** Public market data needs *an* account to read, but not the user's. Before sign
+ *  in, fall back to a throwaway account so the feed still loads. */
+function accountForClient() {
+  if (hasIdentity()) return getAccount();
+  if (!_readAccount) _readAccount = createAccount(Wallet.createRandom().privateKey as `0x${string}`);
+  return _readAccount;
 }
 
 export function client() {
@@ -35,7 +91,7 @@ export function client() {
     _client = createClient({
       chain,
       endpoint: CONFIG.glEndpoint || chain.rpcUrls.default.http[0],
-      account: getAccount(),
+      account: accountForClient(),
     });
   }
   return _client;

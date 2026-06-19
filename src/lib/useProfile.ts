@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getBalance, profileAddress } from "./genlayer";
+import { getBalance, IDENTITY_CHANGED, profileAddress } from "./genlayer";
 
 export function useProfile() {
   const [address, setAddress] = useState<string>("");
@@ -19,6 +19,8 @@ export function useProfile() {
 
   useEffect(() => {
     refresh();
+    window.addEventListener(IDENTITY_CHANGED, refresh);
+    return () => window.removeEventListener(IDENTITY_CHANGED, refresh);
   }, [refresh]);
 
   return { address, balance, loading, refresh };

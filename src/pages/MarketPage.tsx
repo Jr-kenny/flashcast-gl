@@ -7,6 +7,7 @@ import {
   getStake,
   hasClaimed,
   placeBet,
+  requireIdentity,
   type MarketView,
 } from "@/lib/genlayer";
 import { toAtto, toCredits, timeLeft, toBig } from "@/lib/format";
@@ -43,6 +44,7 @@ export default function MarketPage() {
 
   async function onBet() {
     setMsg(null);
+    if (!requireIdentity()) return;
     if (!amount || Number(amount) <= 0) return setMsg({ tone: "error", text: "Enter an amount." });
     setBusy(true);
     try {
@@ -59,6 +61,7 @@ export default function MarketPage() {
 
   async function onClaim() {
     setMsg(null);
+    if (!requireIdentity()) return;
     setBusy(true);
     try {
       await claim(id);

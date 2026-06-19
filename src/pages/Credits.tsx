@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Copy, Wallet } from "lucide-react";
 import { depositEth, hasWallet } from "@/lib/creditRail";
-import { requestRedeem } from "@/lib/genlayer";
+import { requestRedeem, requireIdentity } from "@/lib/genlayer";
 import { toAtto, toCredits, shortAddr } from "@/lib/format";
 import { useProfile } from "@/lib/useProfile";
 import { ConfigBanner, Notice, Spinner } from "@/components/ui";
@@ -16,6 +16,7 @@ export default function Credits() {
 
   async function onBuy() {
     setMsg(null);
+    if (!requireIdentity()) return;
     if (!buy || Number(buy) <= 0) return setMsg({ tone: "error", text: "Enter an ETH amount." });
     setBusy("buy");
     try {
@@ -31,6 +32,7 @@ export default function Credits() {
 
   async function onSell() {
     setMsg(null);
+    if (!requireIdentity()) return;
     if (!sell || Number(sell) <= 0) return setMsg({ tone: "error", text: "Enter a credit amount." });
     if (!payout) return setMsg({ tone: "error", text: "Enter a payout wallet (Base Sepolia)." });
     setBusy("sell");
